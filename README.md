@@ -3,6 +3,7 @@
 
 A script to do the playtime contracts for Roblox Rivals 
 
+![alt](image.png)
 
 ## Installation
 
