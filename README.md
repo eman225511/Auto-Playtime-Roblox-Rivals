@@ -3,6 +3,7 @@
 
 A script to do the playtime contracts for Roblox Rivals 
 
+![alt](image.png)
 
 ## Installation
 
@@ -14,4 +15,4 @@ https://www.python.org/downloads/release/python-31210/
     python AutoPlaytime.py
 ```
 
-# Or run the exe from the release page
+# Or run the exe from the release page [here](https://github.com/eman225511/Auto-Playtime-Roblox-Rivals/releases/tag/V1)
