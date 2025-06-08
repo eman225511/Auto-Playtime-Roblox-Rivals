@@ -252,11 +252,10 @@ class AutoAnyGun:
 
     def find_gun_and_press_keys(self):
         try:
-            # Use correct path for userGun.png in the pics folder
             location = pyautogui.locateCenterOnScreen(os.path.join('pics', 'userGun.png'), grayscale=True, confidence=0.65)
-        except pyautogui.ImageNotFoundException:
+        except Exception:
             print("userGun.png not found on screen (exception).")
-            return
+            return False
 
         if location:
             print("userGun.png found!")
@@ -264,13 +263,15 @@ class AutoAnyGun:
             for i in range(4):
                 keyboard.press_and_release('\\')
                 time.sleep(0.1)
-                for _ in range(2 + self.SLOT):
+                for _ in range(1 + self.SLOT):
                     keyboard.press_and_release('s')
                     time.sleep(0.15)
                 keyboard.press_and_release('enter')
                 keyboard.press_and_release('\\')
+            return True
         else:
             print("userGun.png not found on screen.")
+            return False
 
     def capture_and_save_gun_screenshot(self):
         print("Select the region to capture for userGun.png...")
@@ -300,6 +301,17 @@ class AutoAnyGun:
             time.sleep(interval)
             elapsed += interval
 
+    def check_and_press_respawn(self):
+        try:
+            found1 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn.png'), grayscale=True, confidence=0.8)
+            found2 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn2.png'), grayscale=True, confidence=0.8)
+            if found1 or found2:
+                print("Respawn button detected! Pressing SPACE.")
+                keyboard.press_and_release('space')
+                time.sleep(0.5)
+        except Exception as e:
+            print(f"Error checking for Respawn: {e}")
+
     def run(self):
         time.sleep(5)
         self.last_gun_time = None
@@ -309,6 +321,8 @@ class AutoAnyGun:
                 if keyboard.is_pressed('q'):
                     print("Exiting...")
                     sys.exit()
+
+                self.check_and_press_respawn()
 
                 self.find_gun_and_press_keys()
                 self.safe_sleep(2)
@@ -376,6 +390,17 @@ class AutoGNade:
     def click(self):
         mouse = Controller()
         mouse.click(Button.left)
+        
+    def check_and_press_respawn(self):
+        try:
+            found1 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn.png'), grayscale=True, confidence=0.8)
+            found2 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn2.png'), grayscale=True, confidence=0.8)
+            if found1 or found2:
+                print("Respawn button detected! Pressing SPACE.")
+                keyboard.press_and_release('space')
+                time.sleep(0.5)
+        except Exception as e:
+            print(f"Error checking for Respawn: {e}")
 
     def find_gun_and_press_keys(self):
         try:
@@ -391,7 +416,7 @@ class AutoGNade:
             for i in range(4):
                 keyboard.press_and_release('\\')
                 time.sleep(0.1)
-                for _ in range(2 + self.SLOT):
+                for _ in range(1 + self.SLOT):
                     keyboard.press_and_release('s')
                     time.sleep(0.15)
                 keyboard.press_and_release('enter')
@@ -463,7 +488,9 @@ class AutoGNade:
             if keyboard.is_pressed('q'):
                 print("Exiting...")
                 sys.exit()
-
+                
+            self.check_and_press_respawn()
+            
             self.find_gun_and_press_keys()
             self.safe_sleep(2)
 
