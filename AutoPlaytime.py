@@ -310,7 +310,7 @@ class AutoAnyGun:
                 keyboard.press_and_release('space')
                 time.sleep(0.5)
         except Exception as e:
-            print(f"Error checking for Respawn: {e}")
+            print(f"Respawn not found: {e}")
 
     def run(self):
         time.sleep(5)
@@ -400,7 +400,7 @@ class AutoGNade:
                 keyboard.press_and_release('space')
                 time.sleep(0.5)
         except Exception as e:
-            print(f"Error checking for Respawn: {e}")
+            print(f"Respawn not found: {e}")
 
     def find_gun_and_press_keys(self):
         try:
