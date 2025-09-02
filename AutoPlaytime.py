@@ -298,7 +298,7 @@ class AutoAnyGun:
 
     def find_gun_and_press_keys(self):
         try:
-            location = pyautogui.locateCenterOnScreen(os.path.join('pics', 'userGun.png'), grayscale=True, confidence=0.70)
+            location = pyautogui.locateCenterOnScreen(os.path.join('pics', 'userGun.png'), grayscale=True, confidence=0.69)
         except Exception:
             print("userGun.png not found on screen (exception).")
             return False
@@ -372,16 +372,15 @@ class AutoAnyGun:
                 self.switch_method_1(self.WHAT_EQUIP)
 
                 # Hold A for 0.2 seconds, then D for 0.2 seconds
-                if self.last_gun_time and (time.time() - self.last_gun_time) <= 420:
-                    print("Holding A key...")
-                    keyboard.press('a')
-                    time.sleep(0.2)
-                    keyboard.release('a')
-                    
-                    print("Holding D key...")
-                    keyboard.press('d')
-                    time.sleep(0.2)
-                    keyboard.release('d')
+                print("Holding A key...")
+                keyboard.press('a')
+                time.sleep(0.2)
+                keyboard.release('a')
+                
+                print("Holding D key...")
+                keyboard.press('d')
+                time.sleep(0.2)
+                keyboard.release('d')
 
         elif self.SWITCH_METHOD == '2':
             health_was_found = False
@@ -400,16 +399,15 @@ class AutoAnyGun:
                 health_was_found = health_found
 
                 # Hold A for 0.2 seconds, then D for 0.2 seconds
-                if self.last_gun_time and (time.time() - self.last_gun_time) <= 420:
-                    print("Holding A key...")
-                    keyboard.press('a')
-                    time.sleep(0.2)
-                    keyboard.release('a')
-                    
-                    print("Holding D key...")
-                    keyboard.press('d')
-                    time.sleep(0.2)
-                    keyboard.release('d')
+                print("Holding A key...")
+                keyboard.press('a')
+                time.sleep(0.2)
+                keyboard.release('a')
+                
+                print("Holding D key...")
+                keyboard.press('d')
+                time.sleep(0.2)
+                keyboard.release('d')
 
 # --------- Auto G Nade -------
 
@@ -467,7 +465,7 @@ class AutoGNade:
     def find_gun_and_press_keys(self):
         try:
             # Use correct path for GNade.png in the pics folder
-            location = pyautogui.locateCenterOnScreen(os.path.join('pics', 'GNade.png'), grayscale=True, confidence=0.70)
+            location = pyautogui.locateCenterOnScreen(os.path.join('pics', 'GNade.png'), grayscale=True, confidence=0.69)
         except pyautogui.ImageNotFoundException:
             print("GNade.png not found on screen (exception).")
             return
@@ -554,16 +552,15 @@ class AutoGNade:
             self.safe_sleep(2)
 
             # Hold A for 0.2 seconds, then D for 0.2 seconds
-            if self.last_gun_time and (time.time() - self.last_gun_time) <= 420:
-                print("Holding A key...")
-                keyboard.press('a')
-                time.sleep(0.2)
-                keyboard.release('a')
-                
-                print("Holding D key...")
-                keyboard.press('d')
-                time.sleep(0.2)
-                keyboard.release('d')
+            print("Holding A key...")
+            keyboard.press('a')
+            time.sleep(0.2)
+            keyboard.release('a')
+            
+            print("Holding D key...")
+            keyboard.press('d')
+            time.sleep(0.2)
+            keyboard.release('d')
 
 def global_exception_handler(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, KeyboardInterrupt):
