@@ -16,9 +16,34 @@ from pynput.mouse import Controller, Button
 from colorama import init, Fore, Style
 try:
     from ahk import AHK
-    ahk = AHK()
+    # Try to find AutoHotkey in common installation paths
+    import shutil
+    ahk_paths = [
+        shutil.which('AutoHotkey.exe'),
+        r'C:\Program Files\AutoHotkey\AutoHotkey.exe',
+        r'C:\Program Files (x86)\AutoHotkey\AutoHotkey.exe',
+        r'C:\Users\{}\AppData\Local\Programs\AutoHotkey\AutoHotkey.exe'.format(os.getenv('USERNAME')),
+    ]
+    
+    ahk_exe = None
+    for path in ahk_paths:
+        if path and os.path.exists(path):
+            ahk_exe = path
+            break
+    
+    if ahk_exe:
+        ahk = AHK(executable_path=ahk_exe)
+        print(Fore.GREEN + f"✅ AutoHotkey found at: {ahk_exe}" + Style.RESET_ALL)
+    else:
+        ahk = AHK()  # Try default initialization
+        print(Fore.GREEN + "✅ AutoHotkey initialized with default path" + Style.RESET_ALL)
+        
 except ImportError:
     print(Fore.RED + "❌ AutoHotkey library not installed. Install with: pip install ahk" + Style.RESET_ALL)
+    ahk = None
+except Exception as e:
+    print(Fore.YELLOW + f"⚠️  AutoHotkey initialization failed: {e}" + Style.RESET_ALL)
+    print(Fore.YELLOW + "Will use fallback mouse control instead." + Style.RESET_ALL)
     ahk = None
 init(autoreset=True)
 

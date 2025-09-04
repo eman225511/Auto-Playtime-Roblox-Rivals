@@ -130,6 +130,35 @@ if exist "%SCRIPTPATH%%REQUIREMENTS%" (
     echo [WARNING] Requirements file not found: %REQUIREMENTS%
 )
 
+:: === INSTALL AHK PACKAGE AND AUTOHOTKEY BINARY ===
+echo [*] Installing AutoHotkey (AHK) package...
+"%VENV_PYTHON%" -m pip install ahk --quiet
+if !errorlevel! neq 0 (
+    echo [WARNING] Failed to install AHK package, but continuing...
+) else (
+    echo [+] AHK package installed successfully!
+)
+
+echo [*] Installing AutoHotkey binary via Chocolatey (if available)...
+choco install autohotkey -y >nul 2>&1
+if !errorlevel! equ 0 (
+    echo [+] AutoHotkey binary installed via Chocolatey!
+) else (
+    echo [*] Chocolatey not found. Trying direct download...
+    echo [*] Downloading AutoHotkey installer...
+    curl -L --progress-bar -o "%SCRIPTPATH%AutoHotkey_1.1.37.01_setup.exe" "https://www.autohotkey.com/download/1.1/AutoHotkey_1.1.37.01_setup.exe" >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo [*] Installing AutoHotkey...
+        "%SCRIPTPATH%AutoHotkey_1.1.37.01_setup.exe" /S
+        timeout /t 5 >nul
+        del "%SCRIPTPATH%AutoHotkey_1.1.37.01_setup.exe" >nul 2>&1
+        echo [+] AutoHotkey binary installed!
+    ) else (
+        echo [WARNING] Could not install AutoHotkey binary automatically.
+        echo Please install AutoHotkey manually from: https://www.autohotkey.com/
+    )
+)
+
 :: === VERIFY SCRIPT EXISTS ===
 if not exist "%SCRIPTPATH%%SCRIPT%" (
     echo [ERROR] Script not found: %SCRIPT%
