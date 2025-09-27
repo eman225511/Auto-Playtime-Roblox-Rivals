@@ -33,10 +33,12 @@ try:
             break
     
     if ahk_exe:
+        # Initialize AHK with the found executable
         ahk = AHK(executable_path=ahk_exe)
         print(Fore.GREEN + f"✅ AutoHotkey found at: {ahk_exe}" + Style.RESET_ALL)
     else:
-        ahk = AHK()  # Try default initialization
+        # Try default initialization
+        ahk = AHK()
         print(Fore.GREEN + "✅ AutoHotkey initialized with default path" + Style.RESET_ALL)
         
 except ImportError:
@@ -46,6 +48,20 @@ except Exception as e:
     print(Fore.YELLOW + f"⚠️  AutoHotkey initialization failed: {e}" + Style.RESET_ALL)
     print(Fore.YELLOW + "Will use fallback mouse control instead." + Style.RESET_ALL)
     ahk = None
+# Detect AHK major version (v1 vs v2) to use correct script syntax
+AHK_IS_V2 = False
+try:
+    exe_path = None
+    # Prefer the discovered executable path, else try attribute on ahk object
+    if 'ahk_exe' in globals() and 'v' in str(locals().get('ahk_exe', '')):
+        exe_path = locals().get('ahk_exe')
+    if not exe_path and ahk is not None:
+        exe_path = getattr(ahk, 'executable_path', None)
+    if exe_path and 'v2' in str(exe_path).lower():
+        AHK_IS_V2 = True
+except Exception:
+    AHK_IS_V2 = False
+
 init(autoreset=True)
 
 
@@ -180,30 +196,42 @@ class TrackProgress:
 class AutoPlaytime:
     def __init__(self):
         self.config_file = "playtime_config.json"
-        self.weapon_images = {
-            'primary': 'primary.png',
-            'secondary': 'secondary.png', 
-            'melee': 'melee.png',
-            'utility': 'utility.png'
+        self.config = {
+            'weapon_positions': {
+                'primary': None,
+                'secondary': None, 
+                'melee': None,
+                'utility': None
+            },
+            'current_weapon': 'primary',
+            'discord_settings': {},
+            # New: mouse move tuning (human-like glide)
+            'mouse_move': {
+                'steps': 60,            # number of incremental moves
+                'step_sleep_ms': 8,     # sleep per step (ms)
+                'final_sleep_ms': 100   # final pause before click (ms)
+            }
         }
         self.current_weapon = 'primary'
         self.last_gun_time = None
-        self.config = self.load_config()
+        self.load_config()
 
     def load_config(self):
         """Load configuration from file"""
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
-                    config = json.load(f)
+                    loaded_config = json.load(f)
+                    # Merge loaded config with defaults
+                    self.config.update(loaded_config)
                 print(Fore.GREEN + f"✅ Configuration loaded from {self.config_file}" + Style.RESET_ALL)
-                return config
+                return True
             else:
                 print(Fore.YELLOW + "No existing config found. Will create new one." + Style.RESET_ALL)
-                return {}
+                return False
         except Exception as e:
             print(Fore.RED + f"❌ Error loading config: {e}" + Style.RESET_ALL)
-            return {}
+            return False
 
     def save_config(self):
         """Save configuration to file"""
@@ -214,143 +242,201 @@ class AutoPlaytime:
         except Exception as e:
             print(Fore.RED + f"❌ Error saving config: {e}" + Style.RESET_ALL)
 
+    @property
+    def weapon_positions(self):
+        """Get weapon positions from config"""
+        return self.config.get('weapon_positions', {})
+
+    @weapon_positions.setter
+    def weapon_positions(self, value):
+        """Set weapon positions in config"""
+        self.config['weapon_positions'] = value
+
     def setup_weapons(self):
-        """Setup weapon screenshots"""
-        print(Fore.CYAN + "\n🔫 WEAPON SETUP")
-        print(Fore.WHITE + "You need to capture 4 weapon images for the script to work:")
+        """Setup weapon positions by clicking"""
+        print(Fore.CYAN + "\n🔫 WEAPON POSITION SETUP")
+        print(Fore.WHITE + "You need to set the click positions for 4 weapon types:")
         print(Fore.YELLOW + "  1. PRIMARY" + Fore.WHITE + "   - Main weapons (rifles, SMGs)")
         print(Fore.YELLOW + "  2. SECONDARY" + Fore.WHITE + " - Pistols and backup weapons")  
         print(Fore.YELLOW + "  3. MELEE" + Fore.WHITE + "     - Knives and close-combat weapons")
         print(Fore.YELLOW + "  4. UTILITY" + Fore.WHITE + "   - Grenades and special gadgets")
         print(Fore.BLUE + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" + Style.RESET_ALL)
 
-        # Check if we have existing weapon images
-        existing_weapons = []
-        for weapon_type, filename in self.weapon_images.items():
-            if os.path.exists(os.path.join('pics', filename)):
-                existing_weapons.append(weapon_type)
-
-        if existing_weapons:
-            print(Fore.GREEN + f"Found existing weapon images: {', '.join(existing_weapons)}")
-            use_existing = input(Fore.CYAN + "Do you want to use existing weapon images? (y/n): " + Style.RESET_ALL).strip().lower()
+        # Check if we have existing positions
+        has_existing = any(pos is not None for pos in self.weapon_positions.values())
+        
+        if has_existing:
+            print(Fore.GREEN + "Found existing weapon positions:")
+            for weapon_type, pos in self.weapon_positions.items():
+                if pos:
+                    print(f"  {weapon_type.upper()}: ({pos[0]}, {pos[1]})")
+            
+            use_existing = input(Fore.CYAN + "Do you want to use existing positions? (y/n): " + Style.RESET_ALL).strip().lower()
             if use_existing == 'y':
-                print(Fore.GREEN + "✅ Using existing weapon images" + Style.RESET_ALL)
+                print(Fore.GREEN + "✅ Using existing weapon positions" + Style.RESET_ALL)
                 return
 
-        # Capture new weapon images
-        for weapon_type, filename in self.weapon_images.items():
-            print(Fore.CYAN + f"\n📸 Capturing {weapon_type.upper()} weapon")
-            print(Fore.WHITE + f"Instructions:")
-            print(Fore.WHITE + f"  1. Make sure your {weapon_type} weapon is visible in the game")
-            print(Fore.WHITE + f"  2. You'll see a gray overlay - draw a rectangle around the weapon")
-            print(Fore.WHITE + f"  3. Click and drag to select the weapon area")
-            print(Fore.WHITE + f"  4. Release to capture the image")
-            input(Fore.CYAN + f"Press ENTER when ready to capture {weapon_type.upper()} weapon..." + Style.RESET_ALL)
-            self.capture_weapon_screenshot(weapon_type, filename)
+        # Capture new weapon positions
+        weapon_order = ['primary', 'secondary', 'melee', 'utility']
+        for weapon_type in weapon_order:
+            self.capture_weapon_position(weapon_type)
+        
+        # Save positions to file
+        self.save_config()
 
-    def capture_weapon_screenshot(self, weapon_type, filename):
-        """Capture screenshot for a specific weapon"""
-        print(f"Select the region for {weapon_type} weapon...")
-        region = self.select_region()
-        if region:
-            screenshot = pyautogui.screenshot(region=region)
-            screenshot = screenshot.convert('L')  # Convert to grayscale
-            os.makedirs('pics', exist_ok=True)
-            screenshot.save(os.path.join('pics', filename))
-            print(Fore.GREEN + f"✅ {weapon_type.upper()} weapon saved as pics/{filename}" + Style.RESET_ALL)
-        else:
-            print(Fore.RED + f"❌ No region selected for {weapon_type}" + Style.RESET_ALL)
-
-    def select_region(self):
-        """Select a region on screen"""
-        root = tk.Tk()
-        root.attributes('-fullscreen', True)
-        root.attributes('-alpha', 0.3)
-        root.configure(background='gray')
-        root.title("Select region")
-
-        canvas = tk.Canvas(root, cursor="cross", bg='gray')
-        canvas.pack(fill=tk.BOTH, expand=True)
-
-        rect = None
-        start_x = start_y = 0
-        region = None
-
-        def on_mouse_down(event):
-            nonlocal start_x, start_y, rect
-            start_x, start_y = event.x, event.y
-            rect = canvas.create_rectangle(start_x, start_y, start_x, start_y, outline='black', width=2)
-
-        def on_mouse_drag(event):
-            nonlocal rect
-            canvas.coords(rect, start_x, start_y, event.x, event.y)
-
-        def on_mouse_up(event):
-            nonlocal region
-            x1, y1 = min(start_x, event.x), min(start_y, event.y)
-            x2, y2 = max(start_x, event.x), max(start_y, event.y)
-            width, height = x2 - x1, y2 - y1
-            region = (x1, y1, width, height)
-            root.destroy()
-
-        canvas.bind("<ButtonPress-1>", on_mouse_down)
-        canvas.bind("<B1-Motion>", on_mouse_drag)
-        canvas.bind("<ButtonRelease-1>", on_mouse_up)
-
-        root.mainloop()
-        return region
+    def capture_weapon_position(self, weapon_type):
+        """Capture position for a specific weapon by having user hover and press Enter"""
+        print(Fore.CYAN + f"\n� Setting up {weapon_type.upper()} weapon position")
+        print(Fore.WHITE + "Instructions:")
+        print(Fore.WHITE + f"  1. Open your game and go to the weapon selection screen")
+        print(Fore.WHITE + f"  2. Hover your mouse over the {weapon_type.upper()} weapon")
+        print(Fore.WHITE + f"  3. Press ENTER to capture the position")
+        print(Fore.YELLOW + f"💡 Make sure you're hovering over the {weapon_type} weapon before pressing Enter!")
+        
+        while True:
+            try:
+                keyboard.wait('enter')  # Wait for Enter key
+                # Get current mouse position
+                current_pos = pyautogui.position()
+                
+                # Store as a list with integer coordinates in the unified config
+                self.config['weapon_positions'][weapon_type] = [int(current_pos.x), int(current_pos.y)]
+                print(Fore.GREEN + f"✅ {weapon_type.upper()} position captured: ({current_pos.x}, {current_pos.y})" + Style.RESET_ALL)
+                time.sleep(0.5)  # Brief delay to prevent double-capture
+                break
+                
+            except KeyboardInterrupt:
+                print(Fore.YELLOW + f"\nSkipping {weapon_type} setup..." + Style.RESET_ALL)
+                break
+            except Exception as e:
+                print(Fore.RED + f"Error capturing position: {e}" + Style.RESET_ALL)
+                retry = input(Fore.CYAN + "Try again? (y/n): " + Style.RESET_ALL).strip().lower()
+                if retry != 'y':
+                    break
 
     def click(self, x=None, y=None):
-        """Click using AutoHotkey if available, otherwise fallback to pynput"""
-        if ahk and x is not None and y is not None:
-            ahk.click(x, y)
-            print(f"AHK clicked at ({x}, {y})")
-        elif ahk:
-            ahk.click()
-            print("AHK clicked at current position")
-        else:
-            mouse = Controller()
+        """Click using AutoHotkey only"""
+        # Validate coordinates if provided
+        if x is not None and y is not None:
+            try:
+                x, y = int(x), int(y)
+                # Basic bounds checking
+                if x < 0 or y < 0 or x > 4000 or y > 4000:
+                    print(f"Warning: Coordinates ({x}, {y}) may be out of bounds")
+                    return
+            except (ValueError, TypeError):
+                print(f"Error: Invalid coordinates ({x}, {y})")
+                return
+
+        if not ahk:
+            print("❌ AutoHotkey not available! Please install AutoHotkey.")
+            return
+
+        try:
             if x is not None and y is not None:
-                mouse.position = (x, y)
-                time.sleep(0.05)
-            mouse.click(Button.left)
-            print(f"Pynput clicked at ({x}, {y})" if x and y else "Pynput clicked")
+                # Pull human-like glide params from config with sensible bounds
+                mm = self.config.get('mouse_move', {})
+                steps = int(mm.get('steps', 60))
+                step_sleep_ms = int(mm.get('step_sleep_ms', 8))
+                final_sleep_ms = int(mm.get('final_sleep_ms', 100))
+                # Clamp values to avoid extremes
+                steps = max(5, min(200, steps))
+                step_sleep_ms = max(1, min(50, step_sleep_ms))
+                final_sleep_ms = max(0, min(1000, final_sleep_ms))
+
+                # Build script based on AHK major version
+                if AHK_IS_V2:
+                    # AHK v2 syntax - stepped, human-like glide to target then click
+                    ahk_script = f"""
+CoordMode "Mouse", "Screen"
+MouseGetPos &curX, &curY
+targetX := {x}
+targetY := {y}
+steps := {steps}
+DX := (targetX - curX) / steps
+DY := (targetY - curY) / steps
+Loop steps {{
+    curX += DX
+    curY += DY
+    MouseMove curX, curY, 0
+    Sleep {step_sleep_ms}
+}}
+; ensure exact final position
+MouseMove targetX, targetY, 0
+Sleep {final_sleep_ms}
+Click
+"""
+                else:
+                    # AHK v1 syntax - stepped, human-like glide to target then click
+                    ahk_script = f"""
+CoordMode, Mouse, Screen
+MouseGetPos, curX, curY
+targetX := {x}
+targetY := {y}
+steps := {steps}
+DX := (targetX - curX) / steps
+DY := (targetY - curY) / steps
+Loop, %steps% {{
+    curX := curX + DX
+    curY := curY + DY
+    MouseMove, %curX%, %curY%, 0
+    Sleep, {step_sleep_ms}
+}}
+; ensure exact final position
+MouseMove, %targetX%, %targetY%, 0
+Sleep, {final_sleep_ms}
+Click
+"""
+                ahk.run_script(ahk_script)
+                print(f"AHK smoothly moved to ({x}, {y}) and clicked")
+            else:
+                # Click at current position
+                if AHK_IS_V2:
+                    ahk.run_script("Click")
+                else:
+                    ahk.run_script("Click")
+                print("AHK clicked at current position")
+
+        except Exception as e:
+            print(f"AHK click error: {e}")
+            print(f"Failed to click at ({x}, {y})" if x is not None and y is not None else "Failed to click at current position")
 
     def find_and_click_weapon(self, weapon_type):
-        """Find and click on a specific weapon with persistent detection"""
-        filename = self.weapon_images[weapon_type]
+        """Click on a specific weapon using saved position"""
+        position = self.weapon_positions.get(weapon_type)
         
-        # Try multiple times to find the weapon in case screen is loading
-        for attempt in range(3):
-            try:
-                location = pyautogui.locateCenterOnScreen(os.path.join('pics', filename), grayscale=True, confidence=0.69)
-                if location:
-                    self.last_gun_time = time.time()
-                    # Click once only, faster timing
-                    x, y = location
-                    self.click(x, y)
-                    time.sleep(0.05)  # Very short delay for faster execution
-                    return True
-            except Exception:
-                pass
+        if not position:
+            print(f"{weapon_type} position not set.")
+            return False
+
+        try:
+            # Extract and validate coordinates
+            if not isinstance(position, (list, tuple)) or len(position) != 2:
+                print(f"Invalid position format for {weapon_type}: {position}")
+                return False
+                
+            x, y = position[0], position[1]
             
-            # Brief pause between attempts
-            if attempt < 2:
-                time.sleep(0.05)
-        
-        return False
+            # Ensure coordinates are valid numbers
+            if x is None or y is None:
+                print(f"Invalid coordinates for {weapon_type}: ({x}, {y})")
+                return False
+                
+            # Click at the saved position
+            self.click(x, y)
+            self.last_gun_time = time.time()
+            time.sleep(0.3)  # Increased delay to prevent miss clicks
+            return True
+        except Exception as e:
+            print(f"Error clicking {weapon_type}: {e}")
+            print(f"Position data: {position}")
+            return False
 
     def is_gun_screen_visible(self):
-        """Check if any weapon is visible on screen (indicates gun selection screen)"""
-        for weapon_type in ['primary', 'secondary', 'melee', 'utility']:
-            filename = self.weapon_images[weapon_type]
-            try:
-                location = pyautogui.locateOnScreen(os.path.join('pics', filename), grayscale=True, confidence=0.6)
-                if location:
-                    return True
-            except Exception:
-                continue
-        return False
+        """Check if gun screen is visible by trying to click at any weapon position"""
+        # For position-based clicking, we'll assume gun screen is available
+        # You could enhance this by checking for a specific UI element if needed
+        return any(pos is not None for pos in self.weapon_positions.values())
 
     def switch_weapon(self, weapon_type):
         """Switch to specific weapon using number keys"""
@@ -362,6 +448,26 @@ class AutoPlaytime:
         }
         if weapon_type in weapon_keys:
             keyboard.press_and_release(weapon_keys[weapon_type])
+
+    def check_random_image(self):
+        """Check if Random.png is visible on screen"""
+        try:
+            # Use absolute path and check if file exists first
+            random_image_path = os.path.join(os.getcwd(), 'pics', 'Random.png')
+            
+            # Check if the file exists
+            if not os.path.exists(random_image_path):
+                print(f"Warning: Random.png not found at {random_image_path}")
+                return False
+                
+            random_found = pyautogui.locateOnScreen(random_image_path, grayscale=True, confidence=0.7)
+            return random_found is not None
+        except pyautogui.ImageNotFoundException:
+            # Image file exists but not found on screen - this is normal
+            return False
+        except Exception as e:
+            print(f"Error checking Random.png: {e}")
+            return False
 
     def check_and_press_respawn(self):
         """Check for respawn buttons and press space"""
@@ -389,7 +495,7 @@ class AutoPlaytime:
     def run(self):
         """Main automation loop"""
         print(Fore.GREEN + "\n🚀 Starting automation loop...")
-        print(Fore.YELLOW + "Will continuously look for gun screen and cycle through weapons")
+        print(Fore.YELLOW + "Will click at saved weapon positions only when Random.png is detected")
         print(Fore.MAGENTA + "💡 Press 'Q' to stop safely at any time!" + Style.RESET_ALL)
         
         time.sleep(5)
@@ -404,10 +510,12 @@ class AutoPlaytime:
 
             self.check_and_press_respawn()
             
-            # Check if gun screen is visible
-            if self.is_gun_screen_visible():
-                print(Fore.CYAN + "🔫 Gun selection screen detected!" + Style.RESET_ALL)
-                weapons_clicked_this_round = 0  # Reset counter for new round
+            # Check if Random.png is visible before clicking weapons
+            random_detected = self.check_random_image()
+            
+            if random_detected:
+                print(Fore.CYAN + "🎯 Random.png detected! Performing weapon clicks..." + Style.RESET_ALL)
+                weapons_clicked_this_round = 0
                 
                 # Click all 4 weapons in sequence (faster)
                 for weapon_type in weapon_cycle:
@@ -421,15 +529,15 @@ class AutoPlaytime:
                         print(Fore.GREEN + f"✓ {weapon_type.upper()}" + Style.RESET_ALL)
                         weapons_clicked_this_round += 1
                     
-                    # Very short delay between weapons for speed
-                    time.sleep(0.1)
+                    # Longer delay between weapons to prevent miss clicks
+                    time.sleep(0.5)
                 
-                print(Fore.YELLOW + f"Clicked {weapons_clicked_this_round}/4 weapons this round" + Style.RESET_ALL)
+                if weapons_clicked_this_round > 0:
+                    print(Fore.YELLOW + f"Clicked {weapons_clicked_this_round}/4 weapons this cycle" + Style.RESET_ALL)
             else:
-                # Gun screen not visible, just do movement
-                pass
+                print(Fore.BLUE + "⏳ Random.png not detected, skipping weapon clicks..." + Style.RESET_ALL)
             
-            # Always do movement (whether gun screen is visible or not)
+            # Always do movement (whether weapons were clicked or not)
             print("Movement: A → D")
             
             # Hold A key for 0.15 seconds (faster)
@@ -514,16 +622,12 @@ if __name__ == "__main__":
         print(Fore.BLUE + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" + Style.RESET_ALL)
         print(Fore.GREEN + "🚀 Starting automation...")
         print(Fore.YELLOW + "✅ The script will now:")
-        print(Fore.WHITE + "   • Cycle through ALL weapons (Primary → Secondary → Melee → Utility)")
-        print(Fore.WHITE + "   • Click on weapons automatically when found")
+        print(Fore.WHITE + "   • Monitor for Random.png on screen")
+        print(Fore.WHITE + "   • Click at saved weapon positions only when Random.png is detected")
         print(Fore.WHITE + "   • Switch between weapons using number keys")
         print(Fore.WHITE + "   • Hold A key, then hold D key for movement")
         print(Fore.WHITE + "   • Handle respawning automatically")
-        print(Fore.WHITE + f"   • Look for your {auto.current_weapon.upper()} weapon on screen")
-        print(Fore.WHITE + "   • Click on it automatically when found")
-        print(Fore.WHITE + "   • Switch to the weapon using number keys")
-        print(Fore.WHITE + "   • Perform movement keys (A and D)")
-        print(Fore.WHITE + "   • Handle respawning automatically")
+        print(Fore.GREEN + "   • Tip: Adjust mouse glide in playtime_config.json → mouse_move (steps, step_sleep_ms, final_sleep_ms)")
         print(Fore.MAGENTA + "💡 Remember: Press 'Q' to stop safely at any time!" + Style.RESET_ALL)
         
         threading.Thread(target=auto.run, daemon=True).start()
@@ -540,8 +644,8 @@ if __name__ == "__main__":
         print(Fore.GREEN + "🎉 AUTOMATION IS NOW RUNNING! 🎉")
         print(Fore.WHITE + "The script is working in the background.")
         print(Fore.YELLOW + "💡 What's happening:")
-        print(Fore.WHITE + "   • Monitoring your game screen")
-        print(Fore.WHITE + "   • Cycling through ALL weapons automatically")
+        print(Fore.WHITE + "   • Monitoring your game screen for Random.png")
+        print(Fore.WHITE + "   • Clicking at saved weapon positions only when Random.png is detected")
         print(Fore.WHITE + "   • Holding A key, then holding D key for movement")
         if progress:
             print(Fore.WHITE + "   • Sending progress to Discord")

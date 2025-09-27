@@ -1,6 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Check for administrator privileges
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo This script requires administrator privileges.
+    echo Please right-click and select "Run as administrator"
+    pause
+    exit /b 1
+)
+
 :: === AUTO PLAYTIME RUNNER WITH VIRTUAL ENVIRONMENT ===
 echo.
 echo ======================================================
@@ -129,6 +138,48 @@ if exist "%SCRIPTPATH%%REQUIREMENTS%" (
 ) else (
     echo [WARNING] Requirements file not found: %REQUIREMENTS%
 )
+
+:: === INSTALL AHK AND CHOCOLATEY ===
+echo [*] Installing AHK and Chocolatey packages...
+
+echo [*] Installing ahk[binary] package...
+"%VENV_PYTHON%" -m pip install "ahk[binary]" --quiet
+if !errorlevel! neq 0 (
+    echo [WARNING] Failed to install ahk[binary] package, continuing with alternative setup...
+)
+
+echo [*] Installing Chocolatey...
+powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
+if !errorlevel! neq 0 (
+    echo [WARNING] Chocolatey installation may have failed, continuing...
+)
+
+echo [*] Installing AutoHotkey via Chocolatey...
+choco install autohotkey -y >nul 2>&1
+if !errorlevel! equ 0 (
+    echo [+] AutoHotkey installed successfully via Chocolatey!
+) else (
+    echo [WARNING] AutoHotkey installation via Chocolatey failed, trying alternative method...
+)
+
+echo [*] Adding AHK to PATH...
+for /f "delims=" %%i in ('where /r "C:\Program Files" AutoHotkey.exe 2^>nul') do set "AHK_PATH=%%~dpi"
+if defined AHK_PATH (
+    powershell -Command "[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';!AHK_PATH!', 'Machine')"
+    echo [+] AHK added to system PATH: !AHK_PATH!
+) else (
+    echo [WARNING] AutoHotkey installation not found in expected location
+    echo [*] Checking alternative locations...
+    for /f "delims=" %%i in ('where /r "C:\ProgramData" AutoHotkey.exe 2^>nul') do set "AHK_PATH=%%~dpi"
+    if defined AHK_PATH (
+        powershell -Command "[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';!AHK_PATH!', 'Machine')"
+        echo [+] AHK found and added to PATH: !AHK_PATH!
+    ) else (
+        echo [WARNING] AutoHotkey not found. Script may use fallback mouse control.
+    )
+)
+
+echo [+] AHK and Chocolatey setup completed!
 
 :: === INSTALL AHK PACKAGE AND AUTOHOTKEY BINARY ===
 echo [*] Installing AutoHotkey (AHK) package...
