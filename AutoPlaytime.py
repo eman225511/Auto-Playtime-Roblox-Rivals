@@ -210,6 +210,10 @@ class AutoPlaytime:
                 'steps': 60,            # number of incremental moves
                 'step_sleep_ms': 8,     # sleep per step (ms)
                 'final_sleep_ms': 100   # final pause before click (ms)
+            },
+            # Image detection settings
+            'image_detection': {
+                'confidence': 0.7       # confidence level for image matching (0.0-1.0)
             }
         }
         self.current_weapon = 'primary'
@@ -459,8 +463,12 @@ Click
             if not os.path.exists(random_image_path):
                 print(f"Warning: Random.png not found at {random_image_path}")
                 return False
+            
+            # Get confidence setting from config
+            confidence = self.config.get('image_detection', {}).get('confidence', 0.7)
+            confidence = max(0.1, min(1.0, float(confidence)))  # Clamp between 0.1 and 1.0
                 
-            random_found = pyautogui.locateOnScreen(random_image_path, grayscale=True, confidence=0.7)
+            random_found = pyautogui.locateOnScreen(random_image_path, grayscale=True, confidence=confidence)
             return random_found is not None
         except pyautogui.ImageNotFoundException:
             # Image file exists but not found on screen - this is normal
@@ -472,8 +480,12 @@ Click
     def check_and_press_respawn(self):
         """Check for respawn buttons and press space"""
         try:
-            found1 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn.png'), grayscale=True, confidence=0.7)
-            found2 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn2.png'), grayscale=True, confidence=0.7)
+            # Get confidence setting from config
+            confidence = self.config.get('image_detection', {}).get('confidence', 0.7)
+            confidence = max(0.1, min(1.0, float(confidence)))  # Clamp between 0.1 and 1.0
+            
+            found1 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn.png'), grayscale=True, confidence=confidence)
+            found2 = pyautogui.locateOnScreen(os.path.join('pics', 'Respawn2.png'), grayscale=True, confidence=confidence)
             if found1 or found2:
                 print("Respawn button detected! Pressing SPACE.")
                 keyboard.press_and_release('space')
@@ -628,6 +640,7 @@ if __name__ == "__main__":
         print(Fore.WHITE + "   • Hold A key, then hold D key for movement")
         print(Fore.WHITE + "   • Handle respawning automatically")
         print(Fore.GREEN + "   • Tip: Adjust mouse glide in playtime_config.json → mouse_move (steps, step_sleep_ms, final_sleep_ms)")
+        print(Fore.GREEN + "   • Tip: Adjust image detection confidence in playtime_config.json → image_detection.confidence (0.1-1.0)")
         print(Fore.MAGENTA + "💡 Remember: Press 'Q' to stop safely at any time!" + Style.RESET_ALL)
         
         threading.Thread(target=auto.run, daemon=True).start()
